@@ -2,17 +2,29 @@
 // Copy and paste this simple AppScript into your Google slides along with an API key and translate to French, German, etc.
 // Edit the bottom to add more languages.
 
+function translatePresentation(targetLanguage) {
 
-  function translatePresentation(targetLanguage) {
+  //debug
+  if(targetLanguage == undefined) targetLanguage = "Spanish";
+
   // Get the active presentation
   const presentation = SlidesApp.getActivePresentation();
   const slides = presentation.getSlides();
   
   // Replace these with your API endpoint and key
-  const API_ENDPOINT = 'YOUR_API_ENDPOINT';
-  const API_KEY = 'YOUR_API_KEY';
+  //const API_ENDPOINT = 'YOUR_API_ENDPOINT';
+  //const API_KEY = 'YOUR_API_KEY';
   
-  // Iterate through each slide
+  //Gemini
+  const API_KEY = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY'); 
+  if (!API_KEY) {
+    Logger.log('API key is missing or not set.');
+    return;
+  }
+  const API_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-002:generateContent?key=${API_KEY}`;
+  
+  
+    // Iterate through each slide
   slides.forEach((slide, slideIndex) => {
     // Get all shape elements on the slide that might contain text
     const shapes = slide.getShapes();
@@ -149,13 +161,67 @@ function translateTextWithClaude(text, targetLanguage, apiKey) {
   }
 }
 
-// Main translation function that can use either API
+// Function for Google's Gemini API
+function translateTextWithGemini(text, targetLanguage, apiKey) {
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-002:generateContent?key=${apiKey}`;
+  const options = {
+    method: 'POST',
+    headers: {
+      //Harden - AI is adding a bearer auth entry - take that out.  The key is in the URL submission
+      // 'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    payload: JSON.stringify({
+      contents: {
+        role: "user",
+        parts: [{
+          text: `Translate this English text to ${targetLanguage}. Only respond with the translation, no additional text: ${text}`
+        }]
+      },
+      generationConfig: {
+        temperature: 0.3,
+        maxOutputTokens: 1024
+      }
+    }),
+    muteHttpExceptions: true
+  };
+  
+  try {
+    const response = UrlFetchApp.fetch(endpoint, options);
+    const json = JSON.parse(response.getContentText());
+
+    //Harden
+    //if (!json["candidates"][0]["content"]["parts"][0]["text"]) {
+    //  throw new Error('Unexpected Gemini API response structure: ' + JSON.stringify(json));
+    //}
+
+    //text = json["candidates"][0]["content"]["parts"][0]["text"];
+    //return text;
+
+    // The Gemini API response structure has the content at a different path
+    if (!json.candidates || !json.candidates[0] || !json.candidates[0].content) {
+      throw new Error('Unexpected Gemini API response structure: ' + JSON.stringify(json));
+    }
+    // Handle the response structure more carefully
+    if (!json.candidates?.[0]?.content?.parts?.[0]?.text) {
+      throw new Error('Unexpected Gemini API response structure: ' + JSON.stringify(json));
+    }
+    return json.candidates[0].content.parts[0].text.trim();
+  } catch (error) {
+    Logger.log('Gemini API error: ' + error);
+    throw error;
+  }
+}
+
+// Main translation function that can use any API
 function translateText(text, targetLanguage, apiEndpoint, apiKey) {
   // Detect which API to use based on the endpoint
   if (apiEndpoint.includes('openai')) {
     return translateTextWithChatGPT(text, targetLanguage, apiKey);
   } else if (apiEndpoint.includes('anthropic')) {
     return translateTextWithClaude(text, targetLanguage, apiKey);
+  } else if (apiEndpoint.includes('googleapis')) {
+    return translateTextWithGemini(text, targetLanguage, apiKey);
   } else {
     throw new Error('Unsupported API endpoint');
   }
@@ -186,7 +252,6 @@ function translateToGerman() {
   translatePresentation('German');
 }
 
-
 // Add menu items to trigger translations
 function onOpen() {
   SlidesApp.getUi()
@@ -199,3 +264,38 @@ function onOpen() {
     .addItem('Translate to German', 'translateToGerman')
     .addToUi();
 }
+
+function testGeminiAPI() {
+  const API_KEY = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
+  const API_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-002:generateContent?key=${API_KEY}`;
+  
+  const options = {
+    method: 'POST',
+    headers: {
+      //'Authorization': `Bearer ${API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    payload: JSON.stringify({
+      contents: {
+        role: "user",
+        parts: [{
+          text: `Hello Gemini, how are you?`
+        }]
+      },
+      generationConfig: {
+        temperature: 0.3,
+        maxOutputTokens: 1024
+      }
+    }),
+    muteHttpExceptions: false
+  };
+
+  try {
+    const response = UrlFetchApp.fetch(API_ENDPOINT, options);
+    const json = JSON.parse(response.getContentText());
+    Logger.log(json); 
+  } catch (error) {
+    Logger.log('Error: ' + error);
+  }
+}
+
