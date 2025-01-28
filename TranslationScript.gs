@@ -91,6 +91,65 @@ function translatePresentation(targetLanguage) {
   Logger.log(`Translation to ${targetLanguage} completed!`);
 }
 
+// Helper function to check if response indicates API overload
+function isApiOverloaded(response) {
+  try {
+    const responseText = response.getContentText();
+    const json = JSON.parse(responseText);
+    
+    // Check for various overload indicators
+    const overloadPatterns = [
+      /"code":\s*503/,
+      /"message":\s*"The model is overloaded/,
+      /"status":\s*"UNAVAILABLE"/,
+      /"error":\s*"overloaded"/i,
+      /"error":\s*"rate_limit_exceeded"/i
+    ];
+    
+    // Check response text against patterns
+    if (overloadPatterns.some(pattern => pattern.test(responseText))) {
+      return true;
+    }
+    
+    // Check specific error messages in different response structures
+    if (json.error?.message?.toLowerCase().includes('overloaded')) return true;
+    if (json.error?.toLowerCase().includes('capacity')) return true;
+    
+    return false;
+  } catch (e) {
+    // If we can't parse the response, assume it's not an overload
+    return false;
+  }
+}
+
+// Helper function to implement retry logic with exponential backoff
+function retryWithExponentialBackoff(apiCall) {
+  const maxRetries = 5;
+  const baseDelay = 1000; // Start with 1 second delay
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const response = apiCall();
+      
+      // If response indicates overload, throw error to trigger retry
+      if (isApiOverloaded(response)) {
+        throw new Error('API overloaded');
+      }
+      
+      return response;
+    } catch (error) {
+      if (attempt === maxRetries) {
+        throw error; // Rethrow if we've exhausted all retries
+      }
+      
+      // Calculate delay with exponential backoff and some random jitter
+      const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 1000;
+      Logger.log(`API overloaded, retrying in ${Math.round(delay/1000)} seconds...`);
+      Utilities.sleep(delay);
+    }
+  }
+}
+
 // Function for OpenAI's ChatGPT API
 function translateTextWithChatGPT(text, targetLanguage, apiKey) {
   const endpoint = 'https://api.openai.com/v1/chat/completions';
@@ -118,7 +177,7 @@ function translateTextWithChatGPT(text, targetLanguage, apiKey) {
   };
   
   try {
-    const response = UrlFetchApp.fetch(endpoint, options);
+    const response = retryWithExponentialBackoff(() => UrlFetchApp.fetch(endpoint, options));
     const json = JSON.parse(response.getContentText());
     return json.choices[0].message.content.trim();
   } catch (error) {
@@ -152,7 +211,7 @@ function translateTextWithClaude(text, targetLanguage, apiKey) {
   };
   
   try {
-    const response = UrlFetchApp.fetch(endpoint, options);
+    const response = retryWithExponentialBackoff(() => UrlFetchApp.fetch(endpoint, options));
     const json = JSON.parse(response.getContentText());
     return json.content[0].text.trim();
   } catch (error) {
@@ -187,7 +246,7 @@ function translateTextWithGemini(text, targetLanguage, apiKey) {
   };
   
   try {
-    const response = UrlFetchApp.fetch(endpoint, options);
+    const response = retryWithExponentialBackoff(() => UrlFetchApp.fetch(endpoint, options));
     const json = JSON.parse(response.getContentText());
 
     //Harden
@@ -291,11 +350,10 @@ function testGeminiAPI() {
   };
 
   try {
-    const response = UrlFetchApp.fetch(API_ENDPOINT, options);
+    const response = retryWithExponentialBackoff(() => UrlFetchApp.fetch(API_ENDPOINT, options));
     const json = JSON.parse(response.getContentText());
     Logger.log(json); 
   } catch (error) {
     Logger.log('Error: ' + error);
   }
 }
-
