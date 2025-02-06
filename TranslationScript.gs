@@ -2,14 +2,26 @@
 // Copy and paste this simple AppScript into your Google slides along with an API key and translate to French, German, etc.
 // Edit the bottom to add more languages.
 
-function translatePresentation(targetLanguage) {
-
+function translatePresentation(targetLanguage, currentSlideOnly = false) {
   //debug
   if(targetLanguage == undefined) targetLanguage = "Spanish";
 
-  // Get the active presentation
+  // Get the active presentation and slides
   const presentation = SlidesApp.getActivePresentation();
-  const slides = presentation.getSlides();
+  let slides;
+  
+  if (currentSlideOnly) {
+    // Get only the current slide
+    const currentSlide = presentation.getSelection().getCurrentPage();
+    if (!currentSlide) {
+      Logger.log('No slide selected');
+      return;
+    }
+    slides = [currentSlide];
+  } else {
+    // Get all slides
+    slides = presentation.getSlides();
+  }
   
   // Replace these with your API endpoint and key
   //const API_ENDPOINT = 'YOUR_API_ENDPOINT';
@@ -26,33 +38,38 @@ function translatePresentation(targetLanguage) {
   
     // Iterate through each slide
   slides.forEach((slide, slideIndex) => {
-    // Get all shape elements on the slide that might contain text
-    const shapes = slide.getShapes();
+    // Get all elements on the slide
+    const elements = slide.getPageElements();
     
-    shapes.forEach((shape, shapeIndex) => {
-      // Check if the shape has text
-      if (shape.getText()) {
-        const textRange = shape.getText();
-        const originalText = textRange.asString();
-        
-        // Skip empty text
-        if (!originalText.trim()) return;
-        
-        try {
-          // Make API request to translate text
-          const translatedText = translateText(originalText, targetLanguage, API_ENDPOINT, API_KEY);
+    elements.forEach((element, elementIndex) => {
+      try {
+        // Check if the element is a shape and has text
+        if (element.getPageElementType() === SlidesApp.PageElementType.SHAPE && element.asShape().getText()) {
+          const shape = element.asShape();
+          const textRange = shape.getText();
+          const originalText = textRange.asString();
           
-          // Update the text in the shape
-          textRange.setText(translatedText);
+          // Skip empty text
+          if (!originalText.trim()) return;
           
-          // Add small delay to avoid rate limits
-          Utilities.sleep(100);
-          
-          // Log progress
-          Logger.log(`Translated text to ${targetLanguage} on slide ${slideIndex + 1}, shape ${shapeIndex + 1}`);
-        } catch (error) {
-          Logger.log(`Error translating text on slide ${slideIndex + 1}, shape ${shapeIndex + 1}: ${error}`);
+          try {
+            // Make API request to translate text
+            const translatedText = translateText(originalText, targetLanguage, API_ENDPOINT, API_KEY);
+            
+            // Update the text in the shape
+            textRange.setText(translatedText);
+            
+            // Add small delay to avoid rate limits
+            Utilities.sleep(100);
+            
+            // Log progress
+            Logger.log(`Translated text to ${targetLanguage} on slide ${slideIndex + 1}, element ${elementIndex + 1}`);
+          } catch (error) {
+            Logger.log(`Error translating text on slide ${slideIndex + 1}, element ${elementIndex + 1}: ${error}`);
+          }
         }
+      } catch (error) {
+        Logger.log(`Error processing element on slide ${slideIndex + 1}, element ${elementIndex + 1}: ${error}`);
       }
     });
     
@@ -313,15 +330,49 @@ function translateToGerman() {
 
 // Add menu items to trigger translations
 function onOpen() {
-  SlidesApp.getUi()
-    .createMenu('Translation')
-    .addItem('Translate to English', 'translateToEnglish')
-    .addItem('Translate to French', 'translateToFrench')
-    .addItem('Translate to Spanish', 'translateToSpanish')
-    .addItem('Translate to Korean', 'translateToKorean')
-    .addItem('Translate to Chinese', 'translateToChinese')
-    .addItem('Translate to German', 'translateToGerman')
-    .addToUi();
+  const ui = SlidesApp.getUi();
+  const menu = ui.createMenu('Translation')
+    .addSubMenu(ui.createMenu('Translate All Slides')
+      .addItem('to English', 'translateToEnglish')
+      .addItem('to French', 'translateToFrench')
+      .addItem('to Spanish', 'translateToSpanish')
+      .addItem('to Korean', 'translateToKorean')
+      .addItem('to Chinese', 'translateToChinese')
+      .addItem('to German', 'translateToGerman'))
+    .addSubMenu(ui.createMenu('Translate Current Slide')
+      .addItem('to English', 'translateCurrentToEnglish')
+      .addItem('to French', 'translateCurrentToFrench')
+      .addItem('to Spanish', 'translateCurrentToSpanish')
+      .addItem('to Korean', 'translateCurrentToKorean')
+      .addItem('to Chinese', 'translateCurrentToChinese')
+      .addItem('to German', 'translateCurrentToGerman'));
+  
+  menu.addToUi();
+}
+
+// Functions for translating current slide only
+function translateCurrentToEnglish() {
+  translatePresentation('English', true);
+}
+
+function translateCurrentToFrench() {
+  translatePresentation('French', true);
+}
+
+function translateCurrentToSpanish() {
+  translatePresentation('Spanish', true);
+}
+
+function translateCurrentToKorean() {
+  translatePresentation('Korean', true);
+}
+
+function translateCurrentToChinese() {
+  translatePresentation('Simplified Chinese', true);
+}
+
+function translateCurrentToGerman() {
+  translatePresentation('German', true);
 }
 
 function testGeminiAPI() {
