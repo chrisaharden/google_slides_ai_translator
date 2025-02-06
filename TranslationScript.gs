@@ -2,7 +2,7 @@
 // Copy and paste this simple AppScript into your Google slides along with an API key and translate to French, German, etc.
 // Edit the bottom to add more languages.
 
-function translatePresentation(targetLanguage, currentSlideOnly = false) {
+function translatePresentation(targetLanguage, mode = 'all') {
   //debug
   if(targetLanguage == undefined) targetLanguage = "Spanish";
 
@@ -10,7 +10,7 @@ function translatePresentation(targetLanguage, currentSlideOnly = false) {
   const presentation = SlidesApp.getActivePresentation();
   let slides;
   
-  if (currentSlideOnly) {
+  if (mode === 'current') {
     // Get only the current slide
     const currentSlide = presentation.getSelection().getCurrentPage();
     if (!currentSlide) {
@@ -18,6 +18,20 @@ function translatePresentation(targetLanguage, currentSlideOnly = false) {
       return;
     }
     slides = [currentSlide];
+  } else if (mode === 'current_to_end') {
+    // Get current slide and all following slides
+    const currentSlide = presentation.getSelection().getCurrentPage();
+    if (!currentSlide) {
+      Logger.log('No slide selected');
+      return;
+    }
+    const allSlides = presentation.getSlides();
+    const currentIndex = allSlides.findIndex(slide => slide.getObjectId() === currentSlide.getObjectId());
+    if (currentIndex === -1) {
+      Logger.log('Could not determine current slide position');
+      return;
+    }
+    slides = allSlides.slice(currentIndex);
   } else {
     // Get all slides
     slides = presentation.getSlides();
@@ -83,6 +97,20 @@ function translatePresentation(targetLanguage, currentSlideOnly = false) {
       for (let row = 0; row < numRows; row++) {
         for (let col = 0; col < numCols; col++) {
           const cell = table.getCell(row, col);
+          
+          // Handle merged cells
+          try {
+            const mergeRange = cell.getMergeRange();
+            if (mergeRange) {
+              // Only process the top-left cell of the merge range
+              if (row !== mergeRange.getRow() || col !== mergeRange.getColumn()) {
+                continue; // Skip if not the top-left cell
+              }
+            }
+          } catch (e) {
+            // If getMergeRange() fails, proceed normally
+          }
+          
           const originalText = cell.getText().asString();
           
           // Skip empty cells
@@ -305,27 +333,77 @@ function translateText(text, targetLanguage, apiEndpoint, apiKey) {
 
 // Function handlers for each language
 function translateToFrench() {
-  translatePresentation('French');
+  translatePresentation('French', 'all');
 }
 
 function translateToSpanish() {
-  translatePresentation('Spanish');
+  translatePresentation('Spanish', 'all');
 }
 
 function translateToEnglish() {
-  translatePresentation('English');
+  translatePresentation('English', 'all');
 }
 
 function translateToKorean() {
-  translatePresentation('Korean');
+  translatePresentation('Korean', 'all');
 }
 
 function translateToChinese() {
-  translatePresentation('Simplified Chinese');
+  translatePresentation('Simplified Chinese', 'all');
 }
 
 function translateToGerman() {
-  translatePresentation('German');
+  translatePresentation('German', 'all');
+}
+
+// Functions for translating current slide only
+function translateCurrentToEnglish() {
+  translatePresentation('English', 'current');
+}
+
+function translateCurrentToFrench() {
+  translatePresentation('French', 'current');
+}
+
+function translateCurrentToSpanish() {
+  translatePresentation('Spanish', 'current');
+}
+
+function translateCurrentToKorean() {
+  translatePresentation('Korean', 'current');
+}
+
+function translateCurrentToChinese() {
+  translatePresentation('Simplified Chinese', 'current');
+}
+
+function translateCurrentToGerman() {
+  translatePresentation('German', 'current');
+}
+
+// Functions for translating from current slide to end
+function translateCurrentToEndEnglish() {
+  translatePresentation('English', 'current_to_end');
+}
+
+function translateCurrentToEndFrench() {
+  translatePresentation('French', 'current_to_end');
+}
+
+function translateCurrentToEndSpanish() {
+  translatePresentation('Spanish', 'current_to_end');
+}
+
+function translateCurrentToEndKorean() {
+  translatePresentation('Korean', 'current_to_end');
+}
+
+function translateCurrentToEndChinese() {
+  translatePresentation('Simplified Chinese', 'current_to_end');
+}
+
+function translateCurrentToEndGerman() {
+  translatePresentation('German', 'current_to_end');
 }
 
 // Add menu items to trigger translations
@@ -345,34 +423,16 @@ function onOpen() {
       .addItem('to Spanish', 'translateCurrentToSpanish')
       .addItem('to Korean', 'translateCurrentToKorean')
       .addItem('to Chinese', 'translateCurrentToChinese')
-      .addItem('to German', 'translateCurrentToGerman'));
+      .addItem('to German', 'translateCurrentToGerman'))
+    .addSubMenu(ui.createMenu('Translate Current to End')
+      .addItem('to English', 'translateCurrentToEndEnglish')
+      .addItem('to French', 'translateCurrentToEndFrench')
+      .addItem('to Spanish', 'translateCurrentToEndSpanish')
+      .addItem('to Korean', 'translateCurrentToEndKorean')
+      .addItem('to Chinese', 'translateCurrentToEndChinese')
+      .addItem('to German', 'translateCurrentToEndGerman'));
   
   menu.addToUi();
-}
-
-// Functions for translating current slide only
-function translateCurrentToEnglish() {
-  translatePresentation('English', true);
-}
-
-function translateCurrentToFrench() {
-  translatePresentation('French', true);
-}
-
-function translateCurrentToSpanish() {
-  translatePresentation('Spanish', true);
-}
-
-function translateCurrentToKorean() {
-  translatePresentation('Korean', true);
-}
-
-function translateCurrentToChinese() {
-  translatePresentation('Simplified Chinese', true);
-}
-
-function translateCurrentToGerman() {
-  translatePresentation('German', true);
 }
 
 function testGeminiAPI() {
