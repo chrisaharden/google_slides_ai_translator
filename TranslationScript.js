@@ -50,8 +50,19 @@ function translatePresentation(targetLanguage, mode = 'all') {
   const API_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-002:generateContent?key=${API_KEY}`;
   
   
-    // Iterate through each slide
-  slides.forEach((slide, slideIndex) => {
+  // Iterate through each slide
+  slides.forEach((slide, arrayIndex) => {
+    // Calculate the actual slide index based on mode
+    let slideIndex;
+    if (mode === 'current') {
+      slideIndex = presentation.getSlides().findIndex(s => s.getObjectId() === slide.getObjectId());
+    } else if (mode === 'current_to_end') {
+      const currentSlide = presentation.getSelection().getCurrentPage();
+      const startIndex = presentation.getSlides().findIndex(s => s.getObjectId() === currentSlide.getObjectId());
+      slideIndex = startIndex + arrayIndex;
+    } else {
+      slideIndex = arrayIndex;
+    }
     // Get all elements on the slide
     const elements = slide.getPageElements();
     
