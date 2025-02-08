@@ -461,6 +461,21 @@ function onOpen() {
       .addItem('to German', 'translateCurrentToEndGerman'));
   
   menu.addToUi();
+
+  // Add help menu
+  ui.createMenu('About Translation')
+    .addItem('About Translation Features', 'showTranslationHelp')
+    .addToUi();
+}
+
+// Help function to explain features
+function showTranslationHelp() {
+  const ui = SlidesApp.getUi();
+  ui.alert(
+    'Translation Features',
+    'Google slides doesn\'t make it possible to detect page number fields.  So translations often come back with a note that the model doesn\'t understand or can\'t see the content you are passing.  You\'ll need to manually put page numbers back to the page number fields after translation is done.\n',
+    ui.ButtonSet.OK
+  );
 }
 
 function testGeminiAPI() {
