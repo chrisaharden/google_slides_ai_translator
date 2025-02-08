@@ -45,6 +45,7 @@ function translatePresentation(targetLanguage, mode = 'all') {
   const API_KEY = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY'); 
   if (!API_KEY) {
 
+      const ui = SlidesApp.getUi();
       ui.alert(
           'Missing API Key',
           `The API key for this script is missing or has not been set.`,
