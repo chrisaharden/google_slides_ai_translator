@@ -44,6 +44,13 @@ function translatePresentation(targetLanguage, mode = 'all') {
   //Gemini
   const API_KEY = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY'); 
   if (!API_KEY) {
+
+      ui.alert(
+          'Missing API Key',
+          `The API key for this script is missing or has not been set.`,
+          ui.ButtonSet.OK
+        );
+
     Logger.log('API key is missing or not set.');
     return;
   }
