@@ -372,14 +372,6 @@ function translateTextWithGemini(text, targetLanguage, apiKey) {
     const response = retryWithExponentialBackoff(() => UrlFetchApp.fetch(endpoint, options));
     const json = JSON.parse(response.getContentText());
 
-    //Harden
-    //if (!json["candidates"][0]["content"]["parts"][0]["text"]) {
-    //  throw new Error('Unexpected Gemini API response structure: ' + JSON.stringify(json));
-    //}
-
-    //text = json["candidates"][0]["content"]["parts"][0]["text"];
-    //return text;
-
     // The Gemini API response structure has the content at a different path
     if (!json.candidates || !json.candidates[0] || !json.candidates[0].content) {
       throw new Error('Unexpected Gemini API response structure: ' + JSON.stringify(json));
