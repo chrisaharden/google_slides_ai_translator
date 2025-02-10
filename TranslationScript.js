@@ -168,51 +168,8 @@ function translatePresentation(targetLanguage, mode = 'all') {
   
   Logger.log(`Translation to ${targetLanguage} completed!`);
   
-  // Create a time-driven trigger to show the copy prompt after 2 seconds
-  const triggerId = "copyPromptTrigger_" + new Date().getTime();
-  PropertiesService.getScriptProperties().setProperty('LAST_TRANSLATION_NAME', presentation.getName());
-  PropertiesService.getScriptProperties().setProperty('LAST_TRANSLATION_LANGUAGE', targetLanguage);
-  
-  ScriptApp.newTrigger('showCopyPrompt')
-    .timeBased()
-    .after(2000) // 2 seconds
-    .create();
 }
 
-// Function to show copy prompt and handle the response
-function showCopyPrompt() {
-  const ui = SlidesApp.getUi();
-  const presentation = SlidesApp.getActivePresentation();
-  const originalName = PropertiesService.getScriptProperties().getProperty('LAST_TRANSLATION_NAME');
-  const targetLanguage = PropertiesService.getScriptProperties().getProperty('LAST_TRANSLATION_LANGUAGE');
-  
-  const response = ui.alert(
-    'Translation Complete',
-    'Would you like to make a copy of this presentation?',
-    ui.ButtonSet.YES_NO
-  );
-  
-  if (response === ui.Button.YES) {
-    const copy = presentation.copy(`${originalName} (${targetLanguage} Translation)`);
-    ui.alert(
-      'Copy Created',
-      'A copy of the presentation has been created with the translated content.',
-      ui.ButtonSet.OK
-    );
-  }
-  
-  // Clean up properties
-  PropertiesService.getScriptProperties().deleteProperty('LAST_TRANSLATION_NAME');
-  PropertiesService.getScriptProperties().deleteProperty('LAST_TRANSLATION_LANGUAGE');
-  
-  // Delete all triggers for this function to clean up
-  const triggers = ScriptApp.getProjectTriggers();
-  for (let trigger of triggers) {
-    if (trigger.getHandlerFunction() === 'showCopyPrompt') {
-      ScriptApp.deleteTrigger(trigger);
-    }
-  }
-}
 
 // Helper function to check if response indicates API overload
 function isApiOverloaded(response) {
@@ -372,6 +329,14 @@ function translateTextWithGemini(text, targetLanguage, apiKey) {
     const response = retryWithExponentialBackoff(() => UrlFetchApp.fetch(endpoint, options));
     const json = JSON.parse(response.getContentText());
 
+    //Harden
+    //if (!json["candidates"][0]["content"]["parts"][0]["text"]) {
+    //  throw new Error('Unexpected Gemini API response structure: ' + JSON.stringify(json));
+    //}
+
+    //text = json["candidates"][0]["content"]["parts"][0]["text"];
+    //return text;
+
     // The Gemini API response structure has the content at a different path
     if (!json.candidates || !json.candidates[0] || !json.candidates[0].content) {
       throw new Error('Unexpected Gemini API response structure: ' + JSON.stringify(json));
@@ -514,8 +479,8 @@ function onOpen() {
 function showTranslationHelp() {
   const ui = SlidesApp.getUi();
   ui.alert(
-    'Translation Features',
-    'Google slides doesn\'t make it possible to detect page number fields.  So translations often come back with a note that the model doesn\'t understand or can\'t see the content you are passing.  You\'ll need to manually put page numbers back to the page number fields after translation is done.\n',
+    'About Translation',
+    'Copy the latest version of this script from: https://github.com/chrisaharden/google_slides_ai_translator \nand paste it into your Menu > Extensions > Apps Script > Code.gs file.  \n\nYou will need to add GEMINI_API_KEY (and your own Gemini API key) to a new field in Menu > Extensions > Apps Script > Project Settings, and when you run the script, you\'ll be asked to authorize it to run.\n\nYou can submit bugs and PRs in the github repo too.',
     ui.ButtonSet.OK
   );
 }
