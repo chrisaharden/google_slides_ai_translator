@@ -82,9 +82,11 @@ function translatePresentation(targetLanguage, mode = 'all') {
           const textRange = shape.getText();
           const originalText = textRange.asString();
           
-          // Skip empty text
-          if (!originalText.trim()) return;
-          
+          // Skip empty text, spaces, or non-printable characters
+          if (!originalText.trim() || originalText.replace(/[\s\u0000-\u001F\u007F-\u009F\uE907]/g, '') === '') {
+            Logger.log(`Skipping special field that may cause trash returns, like automated slide numbers.`);
+            return;
+          }
           try {
             // Make API request to translate text
             const translatedText = translateText(originalText, targetLanguage, API_ENDPOINT, API_KEY);
@@ -141,8 +143,11 @@ function translatePresentation(targetLanguage, mode = 'all') {
           
           const originalText = cell.getText().asString();
           
-          // Skip empty cells
-          if (!originalText.trim()) continue;
+          // Skip empty cells, spaces, or non-printable characters
+          if (!originalText.trim() || originalText.replace(/[\s\u0000-\u001F\u007F-\u009F\uE907]/g, '') === '') {
+            Logger.log(`Skipping special field that may cause trash returns, like automated slide numbers.`);
+            continue;
+          }
           
           try {
             // Translate cell content
@@ -162,6 +167,51 @@ function translatePresentation(targetLanguage, mode = 'all') {
   });
   
   Logger.log(`Translation to ${targetLanguage} completed!`);
+  
+  // Create a time-driven trigger to show the copy prompt after 2 seconds
+  const triggerId = "copyPromptTrigger_" + new Date().getTime();
+  PropertiesService.getScriptProperties().setProperty('LAST_TRANSLATION_NAME', presentation.getName());
+  PropertiesService.getScriptProperties().setProperty('LAST_TRANSLATION_LANGUAGE', targetLanguage);
+  
+  ScriptApp.newTrigger('showCopyPrompt')
+    .timeBased()
+    .after(2000) // 2 seconds
+    .create();
+}
+
+// Function to show copy prompt and handle the response
+function showCopyPrompt() {
+  const ui = SlidesApp.getUi();
+  const presentation = SlidesApp.getActivePresentation();
+  const originalName = PropertiesService.getScriptProperties().getProperty('LAST_TRANSLATION_NAME');
+  const targetLanguage = PropertiesService.getScriptProperties().getProperty('LAST_TRANSLATION_LANGUAGE');
+  
+  const response = ui.alert(
+    'Translation Complete',
+    'Would you like to make a copy of this presentation?',
+    ui.ButtonSet.YES_NO
+  );
+  
+  if (response === ui.Button.YES) {
+    const copy = presentation.copy(`${originalName} (${targetLanguage} Translation)`);
+    ui.alert(
+      'Copy Created',
+      'A copy of the presentation has been created with the translated content.',
+      ui.ButtonSet.OK
+    );
+  }
+  
+  // Clean up properties
+  PropertiesService.getScriptProperties().deleteProperty('LAST_TRANSLATION_NAME');
+  PropertiesService.getScriptProperties().deleteProperty('LAST_TRANSLATION_LANGUAGE');
+  
+  // Delete all triggers for this function to clean up
+  const triggers = ScriptApp.getProjectTriggers();
+  for (let trigger of triggers) {
+    if (trigger.getHandlerFunction() === 'showCopyPrompt') {
+      ScriptApp.deleteTrigger(trigger);
+    }
+  }
 }
 
 // Helper function to check if response indicates API overload
