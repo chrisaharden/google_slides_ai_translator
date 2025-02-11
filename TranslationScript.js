@@ -36,26 +36,35 @@ function translatePresentation(targetLanguage, mode = 'all') {
     // Get all slides
     slides = presentation.getSlides();
   }
-  
-  // Replace these with your API endpoint and key
-  //const API_ENDPOINT = 'YOUR_API_ENDPOINT';
-  //const API_KEY = 'YOUR_API_KEY';
-  
+   
+  //--------------------------------------------------------------------------------
+  //NOTE: UNCOMMENT THE API YOU WANT TO USE AND COMMENT OUT THE OTHERS.  YOU CAN ONLY USE ONE AT A TIME. I HAVE COMMENTED OUT CLAUDE FOR NOW.  - Chris
+
   //Gemini
   const API_KEY = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY'); 
+  const API_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-002:generateContent?key=${API_KEY}`;
+  Logger.log('Using Gemini for Translation');
+  
+  //Claude - This is the direct endpoint format.  I have not added code for access via AWS Bedrock.  I hope to do that soon. - Chris
+  //const API_KEY = PropertiesService.getScriptProperties().getProperty('CLAUDE_API_KEY'); 
+  //const API_ENDPOINT = 'https://api.anthropic.com/v1/messages';
+  //Logger.log('Using Claude for Translation');
+
+  //--------------------------------------------------------------------------------
+
+  // Check if API key is set.  If not, alert the user.
   if (!API_KEY) {
 
       const ui = SlidesApp.getUi();
       ui.alert(
           'Missing API Key',
-          `The API key for this script is missing or has not been set.`,
+          `The API key for this script is missing or has not been set.\n Please add your API key to the script properties, and check the code for switching between different models.`,
           ui.ButtonSet.OK
         );
 
     Logger.log('API key is missing or not set.');
     return;
   }
-  const API_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-002:generateContent?key=${API_KEY}`;
   
   
   // Iterate through each slide
