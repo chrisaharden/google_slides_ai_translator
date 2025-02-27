@@ -15,28 +15,69 @@ function translateDocument(targetLanguage, mode = 'all') {
     const selection = document.getSelection();
     if (!selection) {
       Logger.log('No text selected');
+      DocumentApp.getUi().alert('Please select text to translate');
       return;
     }
     elements = selection.getRangeElements();
+    Logger.log(`Found ${elements.length} elements in selection`);
   } else if (mode === 'current_to_end') {
-    // Get current position and all following content
-    const cursor = document.getCursor();
-    if (!cursor) {
-      Logger.log('No cursor position found');
+    try {
+      // Get current position and all following content
+      const cursor = document.getCursor();
+      if (!cursor) {
+        Logger.log('No cursor position found');
+        DocumentApp.getUi().alert('Please position cursor at the starting point');
+        return;
+      }
+      
+      const body = document.getBody();
+      let cursorElement = cursor.getElement();
+      let cursorPosition = 0;
+      
+      // Find the parent element and its position
+      let parentElement = cursorElement.getParent();
+      if (parentElement) {
+        try {
+          cursorPosition = parentElement.getChildIndex(cursorElement);
+          Logger.log(`Cursor is at child index ${cursorPosition} of parent element`);
+        } catch (e) {
+          Logger.log(`Error finding cursor position: ${e}`);
+          // Try to get the parent's parent
+          const grandParent = parentElement.getParent();
+          if (grandParent) {
+            cursorPosition = grandParent.getChildIndex(parentElement);
+            Logger.log(`Using parent element position instead: ${cursorPosition}`);
+          }
+        }
+      } else {
+        // If no parent, try to find position in body
+        for (let i = 0; i < body.getNumChildren(); i++) {
+          if (body.getChild(i).equals(cursorElement)) {
+            cursorPosition = i;
+            break;
+          }
+        }
+      }
+      
+      const totalElements = body.getNumChildren();
+      Logger.log(`Starting from position ${cursorPosition} of ${totalElements} total elements`);
+      
+      // Get all elements from cursor position to end
+      for (let i = cursorPosition; i < totalElements; i++) {
+        elements.push(body.getChild(i));
+      }
+    } catch (e) {
+      Logger.log(`Error in current_to_end mode: ${e}`);
+      DocumentApp.getUi().alert('Error determining cursor position');
       return;
-    }
-    const body = document.getBody();
-    const cursorPosition = cursor.getElement().getParent().getChildIndex(cursor.getElement());
-    const totalElements = body.getNumChildren();
-    
-    // Get all elements from cursor position to end
-    for (let i = cursorPosition; i < totalElements; i++) {
-      elements.push(body.getChild(i));
     }
   } else {
     // Get all content
     const body = document.getBody();
-    for (let i = 0; i < body.getNumChildren(); i++) {
+    const totalElements = body.getNumChildren();
+    Logger.log(`Processing all ${totalElements} document elements`);
+    
+    for (let i = 0; i < totalElements; i++) {
       elements.push(body.getChild(i));
     }
   }
@@ -81,13 +122,15 @@ function processElements(elements, targetLanguage, API_ENDPOINT, API_KEY) {
     const element = elements[i];
     
     try {
-      // Handle different element types
+      // Handle different elements from different modes
       if (element.getType) {
-        // For selection range elements
+        // For regular body elements (all mode and current_to_end mode)
+        processElementByType(element, targetLanguage, API_ENDPOINT, API_KEY);
+      } else if (element.getElement) {
+        // For selection range elements (current mode)
         processElementByType(element.getElement(), targetLanguage, API_ENDPOINT, API_KEY);
       } else {
-        // For direct elements
-        processElementByType(element, targetLanguage, API_ENDPOINT, API_KEY);
+        Logger.log(`Unrecognized element type: ${typeof element}`);
       }
     } catch (error) {
       Logger.log(`Error processing element ${i}: ${error}`);
@@ -359,7 +402,7 @@ function translateTextWithClaude(text, targetLanguage, apiKey) {
       messages: [
         {
           role: 'user',
-          content: `Translate this English text to ${targetLanguage}. Only respond with the translation, no additional text: ${text}`
+          content: `Translate this text to ${targetLanguage}. Only respond with the translation, no additional text: ${text}`
         }
       ]
     }),
@@ -390,7 +433,7 @@ function translateTextWithGemini(text, targetLanguage, apiKey) {
       contents: {
         role: "user",
         parts: [{
-          text: `Translate this English text to ${targetLanguage}. Only respond with the translation, no additional text: ${text}`
+          text: `Translate this text to ${targetLanguage}. Only respond with the translation, no additional text: ${text}`
         }]
       },
       generationConfig: {
